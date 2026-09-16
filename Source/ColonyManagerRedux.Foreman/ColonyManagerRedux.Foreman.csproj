@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <UseLaboratory>true</UseLaboratory>
+        <RootNamespace>ColonyManagerRedux.Foreman</RootNamespace>
+        <AssemblyName>ColonyManagerRedux.Foreman</AssemblyName>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\ColonyManagerRedux\ColonyManagerRedux.csproj" />
+    </ItemGroup>
+</Project>

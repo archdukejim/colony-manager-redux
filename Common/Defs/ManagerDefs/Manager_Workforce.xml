@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+    <!--
+        Foreman's "Workforce" planner, added to Colony Manager Redux. Jobless (no managerJobClass): it is a
+        colony-wide tab backed by an always-on WorkforceComp, not a per-station manager job. order 1 places
+        it right after Overview (order 0). iconArea Left pins it with the cross-cutting tabs.
+    -->
+    <ColonyManagerRedux.ManagerDef>
+        <defName>CMR_WorkforceManager</defName>
+        <order>1</order>
+        <managerTabClass>ColonyManagerRedux.Foreman.ManagerTab_Workforce</managerTabClass>
+        <iconArea>Left</iconArea>
+        <iconPath>UI/Icons/CMR_Overview</iconPath>
+        <label>Workforce</label>
+        <managerComps>
+            <li>
+                <compClass>ColonyManagerRedux.Foreman.WorkforceComp</compClass>
+            </li>
+        </managerComps>
+    </ColonyManagerRedux.ManagerDef>
+</Defs>
