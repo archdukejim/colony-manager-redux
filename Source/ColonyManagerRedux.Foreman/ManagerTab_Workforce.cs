@@ -3,18 +3,20 @@ using ilyvion.Laboratory.UI;
 namespace ColonyManagerRedux.Foreman;
 
 // Foreman's colony-wide work planner, surfaced in Colony Manager Redux as the "Workforce" tab.
-// Jobless tab (derives from the non-generic ManagerTab): it has no per-desk manager job — the planning
-// runs for free in WorkforceComp, which ticks every game tick regardless of any manager pawn or station.
+// Jobless tab (derives from the non-generic ManagerTab): the planning runs for free in WorkforceComp,
+// which ticks every game tick regardless of any manager pawn or station.
 //
-// For now the tab is the per-activity control surface: every manageable activity (at vanilla WorkGiver
-// granularity) with an enable switch. Disabled rows are activities whose steering isn't written yet — visible
-// but not switchable — so you can watch the feature fill in and test each piece in isolation as it lands.
+// Two things live here today:
+//  - Isolation mode (testing): a master switch + a list of allowed work types. When on, all other work
+//    types are suppressed, so a pawn does only the selected work or wanders — the harness for testing one
+//    work group at a time, and the first proof Foreman can override vanilla work selection.
+//  - The per-activity control surface (WorkGiver granularity, finer than the vanilla Work tab): each
+//    activity with an enable switch; not-implemented rows are shown greyed and non-switchable.
 [HotSwappable]
 internal sealed class ManagerTab_Workforce(Manager manager) : ManagerTab(manager)
 {
     private readonly ScrollViewStatus _scrollViewStatus = new();
 
-    // No auto-created job: this tab manages the colony-wide plan, not a per-station manager job.
     protected override bool CreateNewSelectedJobOnMake => false;
 
     private WorkforceComp? Comp => Manager.CompOfType<WorkforceComp>();
@@ -28,15 +30,24 @@ internal sealed class ManagerTab_Workforce(Manager manager) : ManagerTab(manager
             return;
         }
 
-        var introRect = new Rect(canvas.x, canvas.y, canvas.width, Constants.ListEntryHeight);
-        Widgets.Label(introRect,
-            "Enable the activities Foreman should manage. Disabled rows aren't implemented yet.");
+        // Master isolation toggle.
+        var toggleRect = new Rect(canvas.x, canvas.y, canvas.width, Constants.ListEntryHeight);
+        var isolation = comp.IsolationMode;
+        var isolationBefore = isolation;
+        Widgets.CheckboxLabeled(
+            toggleRect,
+            "Isolation mode (testing) — suppress all work except the allowed work types below",
+            ref isolation);
+        if (isolation != isolationBefore)
+        {
+            comp.IsolationMode = isolation;
+        }
 
         var listRect = new Rect(
             canvas.x,
-            introRect.yMax + Constants.Margin,
+            toggleRect.yMax + Constants.Margin,
             canvas.width,
-            canvas.height - introRect.height - Constants.Margin);
+            canvas.yMax - toggleRect.yMax - Constants.Margin);
 
         using var scrollView = GUIScope.ScrollView(listRect, _scrollViewStatus);
         using var _ = GUIScope.TextAnchor(TextAnchor.MiddleLeft);
@@ -44,6 +55,53 @@ internal sealed class ManagerTab_Workforce(Manager manager) : ManagerTab(manager
         var width = scrollView.ViewRect.width;
         var cur = Vector2.zero;
 
+        if (comp.IsolationMode)
+        {
+            DrawIsolationSection(comp, ref cur, width);
+        }
+
+        DrawCatalog(comp, ref cur, width);
+
+        if (Event.current.type == EventType.Layout)
+        {
+            scrollView.Height = cur.y;
+        }
+    }
+
+    private static void DrawIsolationSection(WorkforceComp comp, ref Vector2 cur, float width)
+    {
+        Widgets.ListSeparator(ref cur.y, width, "Allowed work types (isolation)");
+
+        var workTypes = DefDatabase<WorkTypeDef>.AllDefsListForReading
+            .Where(wt => wt.visible)
+            .OrderByDescending(wt => wt.naturalPriority);
+
+        var i = 0;
+        foreach (var wt in workTypes)
+        {
+            var row = new Rect(cur.x, cur.y, width, Constants.ListEntryHeight);
+            if (i++ % 2 == 0)
+            {
+                Widgets.DrawAltRect(row);
+            }
+
+            var allowed = comp.IsWorkTypeAllowed(wt.defName);
+            var allowedBefore = allowed;
+            var label = wt.labelShort.NullOrEmpty() ? wt.defName : wt.labelShort.CapitalizeFirst();
+            Widgets.CheckboxLabeled(row.ContractedBy(Constants.Margin, 0f), label, ref allowed);
+            if (allowed != allowedBefore)
+            {
+                comp.SetWorkTypeAllowed(wt.defName, allowed);
+            }
+
+            cur.y += Constants.ListEntryHeight;
+        }
+
+        cur.y += Constants.Margin;
+    }
+
+    private static void DrawCatalog(WorkforceComp comp, ref Vector2 cur, float width)
+    {
         foreach (var section in WorkforceCatalog.Sections)
         {
             Widgets.ListSeparator(ref cur.y, width, section.Label);
@@ -86,11 +144,6 @@ internal sealed class ManagerTab_Workforce(Manager manager) : ManagerTab(manager
             }
 
             cur.y += Constants.Margin;
-        }
-
-        if (Event.current.type == EventType.Layout)
-        {
-            scrollView.Height = cur.y;
         }
     }
 }
